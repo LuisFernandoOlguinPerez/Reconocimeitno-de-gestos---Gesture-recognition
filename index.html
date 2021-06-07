@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="theme-color" content="#FFF" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title> gestureRecognition </title>
+    <style>
+        body {
+            margin: 0 auto
+        }
+
+        canvas {
+            display: block;
+            height: 100%;
+            margin: 0 auto;
+            width: 240px
+        }
+
+        #left {
+            width: 45%;
+            padding-right: 10px;
+            display: block
+        }
+
+        #right {
+            width: 45%;
+            padding-left: 10px;
+            display: block
+        }
+
+        #main {
+            width: 100%;
+            margin: 0 auto;
+            padding-left: 0;
+            display: flex;
+            flex-flow: row wrap;
+            justify-content: space-around;
+            align-items: center
+        }
+
+        #run,
+        #train {
+            text-transform: uppercase;
+            text-align: center;
+            margin: 0 auto;
+            padding-left: 0;
+            width: 100%;
+            height: 48px
+        }
+
+        #labelButtonLeft,
+        #labelButtonRight,
+        #load-data,
+        #download-data {
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        #labelButtonLeft,
+        #labelButtonRight,
+        #labelInputLeft,
+        #load-data,
+        #download-data {
+            border: 1px solid #000;
+            width: 100%;
+            height: 42px;
+            transition: all .5s;
+            display: block;
+            text-align: center;
+        }
+
+        button {
+            background-color: #106ba0;
+            color: #fff;
+            border: none;
+            border: 1px solid #000
+        }
+        #file-input{
+            width: 90%;
+            border: 1px solid #000;
+            color: #fff;
+            background-color: #106ba0;
+            display: block;
+            transition: all .5s;
+            cursor: pointer;
+            padding: 15px 40px !important;
+            text-transform: uppercase;
+            text-align: center
+        }
+
+        #file-div {
+            width: 85%;
+            display: flex;
+            flex-flow: row wrap;
+            justify-content: space-around;
+            align-items: center
+        }
+
+        #file-span {
+            border: 1px solid #000;
+            color: #fff;
+            width: 90%;
+            background-color: #084b80;
+            transition: all .5s;
+            display: block;
+            padding: 15px 40px !important;
+            text-transform: uppercase;
+            text-align: center
+        }
+    </style>
+</head>
+
+<body ondrop="dropHandler(event);" ondragover="dragOverHandler(event);">
+
+    <div id="main">
+
+        <div id="left">
+        </div>
+
+        <div id="right">
+        </div>
+        <br />
+        <button id="run" style="display:none;">Entrenar con base y ejecutar pruebas</button>
+        <button id="train" style="display:none;">Reiniciar y crear nueva base</button>
+        <br />
+        <div id="file-div" style="display:block;">
+            <label id="file-input">Arrastra y suelta el archivo de datos aqui!!!</label>
+            <span id="file-span"></span>
+            <button id="load-data" style="display:none;">Cargar datos y ejecutar pruebas</button>
+        </div>
+            <button id="download-data" style="display:none;">Descargar datos</button>
+        <script>
+class Matrix {
+    constructor(t, e, a = 0) {
+        this.rows = t || 0, this.cols = e || 0, a instanceof Array ? this.data = a.slice() : this.data = "RANDOM" == a ? Array(this.rows * this.cols).fill().map(t => 2 * Math.random() - 1) : Array(this.rows * this.cols).fill(a)
+    }
+    multiply(t) {
+        if (t.rows !== this.cols) return null;
+        let e = new Matrix(this.rows, t.cols);
+        for (let a = 0; a < this.rows; a++)
+            for (let n = 0; n < t.cols; n++) {
+                let i = 0;
+                for (let e = 0; e < this.cols; e++) i += this.data[a * this.cols + e] * t.data[e * t.cols + n];
+                e.data[a * e.cols + n] = i
+            }
+        return e
+    }
+    transpose() {
+        for (let t = 0; t < this.rows; t++)
+            for (let e = 0; e < this.cols; e++) {
+                let a = this.data[t * this.cols + e];
+                this.data[t * this.cols + e] = this.data[e * this.rows + t], this.data[e * this.rows + t] = a
+            }
+        let t = this.cols;
+        this.cols = this.rows, this.rows = t
+    }
+    add(t) {
+        if (this.rows != t.rows || this.cols != t.cols) return null;
+        for (let e = 0; e < this.data.length; e++) this.data[e] += t.data[e]
+    }
+    subtract(t) {
+        if (this.rows != t.rows || this.cols != t.cols) return null;
+        for (let e = 0; e < this.data.length; e++) this.data[e] -= t.data[e]
+    }
+    scalar(t) {
+        for (let e = 0; e < this.data.length; e++) this.data[e] *= t
+    }
+    hadamard(t) {
+        if (this.rows != t.rows || this.cols != t.cols) return null;
+        for (let e = 0; e < this.data.length; e++) this.data[e] *= t.data[e]
+    }
+    copy() {
+        return new Matrix(this.rows, this.cols, this.data)
+    }
+    foreach(t) {
+        for (let e = 0; e < this.data.length; e++) this.data[e] = t(this.data[e])
+    }
+}
+class Perceptron {
+    constructor(t) {
+        this.weights = [], this.bias = null, this.learningRate = .01, this.maxOutput = null, this.minOutput = null, this.rangeError = null, this.maxTime = null, this.epochs = 100, this.neurons = 1, this.returnText = !1, this.limitsOutputs = !0, this.inputs = [], this.inputsOnText = [], this.outputs = [], this.outputsOnText = [];
+        for (let e in t) this[e] = t[e]
+    }
+    shuffle(t) {
+        if (0 == this.weights.length)
+            for (let e = 0; e < t; e++) this.weights[e] = .4 * Math.random() + .1;
+        null === this.bias && (this.bias = .4 * Math.random() + .1)
+    }
+    run(t) {
+        let e = t;
+        if ("string" == typeof t) {
+            let e = [];
+            for (let a = 0; a < t.toString().length; a++) e = e.concat(t.toString().charCodeAt(a).toString(2).split(""));
+            for (let t = 0; t < e.length; t++) e[t] = Number(e[t]);
+            t = e
+        }
+        if (t.length < this.weights.length) {
+            let e = this.weights.length - t.length,
+                a = Array(e).fill("0");
+            t = t.concat(a);
+            for (let e = 0; e < t.length; e++) t[e] = Number(t[e])
+        }
+        if (t.length > this.weights.length) {
+            let e = [];
+            for (let a = 0; a < this.weights.length; a++) e[a] = t[a];
+            t = e
+        }
+        let a = this.minOutput;
+        for (let e = 0; e < t.length; e++) a += this.weights[e] * Number(t[e]);
+        a += this.bias, a = parseFloat(Math.min(Number(this.maxOutput), Math.max(Number(this.minOutput), a))), a = parseFloat(parseFloat(a).toPrecision(16)).toFixed(16);
+        let n = this.rangeError,
+            i = function() {
+                return Number(a) > Math.round(Number(a)) ? Math.min(.9999999999999999, Math.max(0, 1 - (Number(a) - n - Math.round(Number(a))))) : Number(a) < Math.round(Number(a)) ? Math.min(.9999999999999999, Math.max(0, 1 - (Math.round(Number(a)) - (Number(a) + n)))) : Number(a) == Math.round(Number(a)) ? parseFloat(.9999999999999999) : void 0
+            },
+            o = function(t) {
+                var e;
+                return Math.abs(t) < 1 ? (e = parseInt(t.toString().split("e-")[1])) && (t *= Math.pow(10, e - 1), t = "0." + new Array(e).join("0") + t.toString().substring(2)) : (e = parseInt(t.toString().split("+")[1])) > 20 && (e -= 20, t /= Math.pow(10, e), t += new Array(e + 1).join("0")), t
+            },
+            r = function(t, e) {
+                let a = [],
+                    n = "",
+                    i = "";
+                if ((t = t.toString()).includes(".")) {
+                    n = t.toString().split(".")[0], i = t.toString().split(".")[1], a[0] = n + ".";
+                    for (let t = 1; t < e + 1; t++) a[t] = i.split("")[t - 1] || 0
+                } else {
+                    a[0] = t + ".";
+                    for (let t = 1; t < e + 1; t++) a[t] = 0
+                }
+                return a.join("")
+            },
+            s = {};
+        if (0 != this.returnText) s = {
+            input: e.toString(),
+            probability: r(o(Number(parseFloat(parseFloat(Math.abs(i())).toPrecision(16)).toFixed(16))).toString(), 16),
+            intention: this.inputsOnText[Math.round(a)].toString(),
+            output: this.outputsOnText[Math.round(a)].toString(),
+            rangeError: r(o(n.toString()), 16)
+        };
+        else {
+            let t = [];
+            for (let e = 0; e < this.outputsOnText.length; e++) {
+                let a = this.outputsOnText[e];
+                t.includes(this.outputsOnText[e]) || t.push(a)
+            }
+            let l = t.indexOf(this.outputsOnText[Math.round(Number(a))]),
+                u = function(e, n, i, s, l) {
+                    null == t[i] && (n += 1, i += 1), null == t[n] && (n -= 1, i = i);
+                    let u = t[n],
+                        d = t[i],
+                        h = Math.min(u, d),
+                        c = Math.max(u, d),
+                        p = function(t) {
+                            return t < 0 ? -1 * t : t
+                        },
+                        g = 0;
+                    return g = Number(a) >= Math.round(Number(a)) || (Number(a), Math.round(Number(a)), 0) ? c < 0 && h < 0 ? -(g = parseFloat(parseFloat(s * (p(h) - p(c)) + p(c)).toPrecision(16)).toFixed(16)) : h < 0 && c >= 0 ? l < 0 ? parseFloat(parseFloat(p(s) * -(p(c) + p(h)) + p(c)).toPrecision(16)).toFixed(16) : parseFloat(parseFloat(p(s) * (p(h) - p(c)) + p(c)).toPrecision(16)).toFixed(16) : l > 0 ? parseFloat(parseFloat(p(s) * (p(c) - p(h)) + p(h)).toPrecision(16)).toFixed(16) : parseFloat(parseFloat(p(s) * (p(h) - p(c)) + p(c)).toPrecision(16)).toFixed(16) : c < 0 && h < 0 ? -(g = parseFloat(parseFloat(p(s) * (p(h) - p(c)) + p(c)).toPrecision(16)).toFixed(16)) : h < 0 && c >= 0 ? l < 0 ? parseFloat(parseFloat(p(s) * -(p(c) + p(h)) + p(c)).toPrecision(16)).toFixed(16) : parseFloat(parseFloat(p(s) * (p(h) - p(c)) + p(h)).toPrecision(16)).toFixed(16) : 0 == l ? parseFloat(parseFloat(p(s) * (p(h) - p(c)) + p(c)).toPrecision(16)).toFixed(16) : l < 0 ? parseFloat(parseFloat(p(s) * (p(c) - p(h)) + p(h)).toPrecision(16)).toFixed(16) : parseFloat(parseFloat(p(s) * (p(c) + p(h)) - p(h)).toPrecision(16)).toFixed(16), r(o(parseFloat(Math.min(c, Math.max(h, o(parseFloat(parseFloat(g).toFixed(17)).toPrecision(16)))))), 16)
+                };
+            s = {
+                input: e.toString(),
+                probability: r(o(Number(parseFloat(parseFloat(Math.abs(i())).toPrecision(16)).toFixed(16))).toString(), 16),
+                intention: this.inputsOnText[Math.round(Number(a))].toString(),
+                output: r(o(u(t, l, l - 1, Number(a) > Math.round(Number(a)) ? Math.min(.9999999999999999, Math.max(0, 1 - (Number(a) - Math.round(Number(a))))) : Number(a) < Math.round(Number(a)) ? Math.min(.9999999999999999, Math.max(0, 1 - (Math.round(Number(a)) - Number(a)))) : Number(a) == Math.round(Number(a)) ? parseFloat(.9999999999999999) : void 0, this.outputsOnText[Math.round(Number(a))])), 16),
+                rangeError: r(o(n.toString()), 16)
+            }
+        }
+        return s
+    }
+    train(t = {
+        inputs: [],
+        outputs: []
+    }) {
+        let e = [],
+            a = [];
+        e = t.inputs, a = t.outputs;
+        for (let t = 0; t < a.length; t++) "string" == typeof a[t] && (this.returnText = !0);
+        this.limitsOutputs = !0, this.inputs = [], this.inputsOnText = [], this.outputs = [], this.outputsOnText = [];
+        for (let t = 0; t < e.length; t++) {
+            if ("string" == typeof e[t]) {
+                let a = [];
+                for (let n = 0; n < e[t].toString().length; n++) a = a.concat(e[t].toString().charCodeAt(n).toString(2).split(""));
+                for (let t = 0; t < a.length; t++) a[t] = Number(a[t]);
+                this.inputs[t] = a
+            } else this.inputs[t] = e[t];
+            this.inputsOnText[t] = e[t]
+        }
+        for (let t = 0; t < a.length; t++) this.outputs[t] = t, this.outputsOnText[t] = a[t];
+        let n = [];
+        for (let t = 0; t < this.inputs.length; t++) {
+            var i = 0;
+            for (let e = 0; e < this.inputs[t].length; e++) i++;
+            n.push(i)
+        }
+        n = Math.max.apply(null, n);
+        for (let t = 0; t < this.inputs.length; t++)
+            if (this.inputs[t].length < n) {
+                let e = n - this.inputs[t].length,
+                    a = Array(e).fill("0");
+                this.inputs[t] = this.inputs[t].concat(a);
+                for (let e = 0; e < this.inputs[t].length; e++) this.inputs[t][e] = Number(this.inputs[t][e])
+            }(null === this.bias && 0 == this.weights.length || null === this.bias) && this.shuffle(n), null == this.maxOutput && (this.maxOutput = Math.max.apply(null, this.outputs)), null == this.minOutput && (this.minOutput = Math.min.apply(null, this.outputs));
+        let o = 0,
+            r = (new Date).getTime();
+        for (let t = 0; t < Math.abs(this.epochs); t++) {
+            if (null !== this.maxTime && (new Date).getTime() - r >= this.maxTime) return this.rangeError = Number(o.toPrecision(16)), this;
+            for (let t = 0; t < this.inputs.length; t++) {
+                let e = this.inputs[t],
+                    a = this.outputs[t],
+                    n = 0;
+                for (let t = 0; t < Math.abs(this.neurons); t++) {
+                    let t = 0;
+                    for (let a = 0; a < e.length; a++) t += this.weights[a] * Number(e[a]);
+                    t += this.bias, t = parseFloat(Math.min(Number(this.maxOutput), Math.max(Number(this.minOutput), t))), t = parseFloat(parseFloat(t).toPrecision(16)).toFixed(16), t = Number(t), n = Number(a) - t, o += Math.abs(n), o /= this.inputs.length, this.fitData(n, e)
+                }
+            }
+        }
+        this.rangeError = Number(o.toPrecision(16))
+    }
+    fitData(t, e) {
+        for (let a = 0; a < e.length; a++) {
+            let n = t * Number(e[a]) * this.learningRate;
+            this.weights[a] = this.weights[a] + n
+        }
+        let a = 1 * t * this.learningRate;
+        this.bias = this.bias + a
+    }
+    load(t) {
+        t = JSON.parse(t), this.weights = t.weights, this.bias = t.bias, this.learningRate = t.learningRate, this.maxOutput = t.maxOutput, this.minOutput = t.minOutput, this.rangeError = t.rangeError, this.maxTime = t.maxTime, this.epochs = t.epochs, this.neurons = t.neurons, this.returnText = t.returnText, this.inputs = t.inputs, this.outputs = t.outputs, this.inputsOnText = t.inputsOnText, this.outputsOnText = t.outputsOnText
+    }
+    save() {
+        let t = {
+                weights: this.weights,
+                bias: this.bias,
+                learningRate: this.learningRate,
+                maxOutput: this.maxOutput,
+                minOutput: this.minOutput,
+                rangeError: this.rangeError,
+                maxTime: this.maxTime,
+                epochs: this.epochs,
+                neurons: this.neurons,
+                returnText: this.returnText,
+                inputs: this.inputs,
+                outputs: this.outputs,
+                inputsOnText: this.inputsOnText,
+                outputsOnText: this.outputsOnText
+            },
+            e = new Blob([JSON.stringify(t)], {
+                type: "text/json"
+            }),
+            a = document.createElement("a");
+        a.href = window.URL.createObjectURL(e), a.download = "data.json", a.click()
+    }
+}
+var widthCanvas = 48,
+    heightCanvas = 48,
+    widthCanvasVideo = 144,
+    heightCanvasVideo = 144,
+    widthVideo = 240,
+    heightVideo = 240;
+class ImageUtils {
+    static gaussianBlur(t) {
+        let e = [.003765, .015019, .023792, .015019, .003765, .015019, .059912, .094907, .059912, .015019, .023792, .094907, .150342, .094907, .023792, .015019, .059912, .094907, .059912, .015019, .003765, .015019, .023792, .015019, .003765],
+            a = new ImageData(t.data, t.width, t.height);
+        for (let n = 2; n < t.height - 2; n++)
+            for (let i = 2; i < t.width - 2; i++) {
+                let o = 0;
+                for (let a = -2; a < 3; a++)
+                    for (let r = -2; r < 3; r++) o += t.data[4 * (n + a) * t.width + 4 * (i + r)] * e[5 * (a + 2) + (r + 2)];
+                a.data[4 * (n * t.width + i)] = o, a.data[4 * (n * t.width + i) + 1] = o, a.data[4 * (n * t.width + i) + 2] = o, a.data[4 * (n * t.width + i) + 3] = 255
+            }
+        return a
+    }
+    static rgb2gray(t) {
+        for (let e = 0; e < t.data.length; e += 4) {
+            let a = .2126 * t.data[e] + .7152 * t.data[e + 1] + .0722 * t.data[e + 2];
+            t.data[e] = a, t.data[e + 1] = a, t.data[e + 2] = a
+        }
+        return t
+    }
+    static draw(t) {
+        let e = document.createElement("canvas");
+        e.width = widthCanvas, e.height = heightCanvas;
+        let a = e.getContext("2d");
+        for (let e = 0; e < widthCanvas; e++)
+            for (let n = 0; n < heightCanvas; n++) {
+                let i = t[n * widthCanvas + e];
+                a.fillStyle = "rgb(" + i + "," + i + "," + i + ")", a.fillRect(e, n, 1, 1)
+            }
+        document.body.appendChild(e)
+    }
+}
+var inputs = [],
+    outputs = [];
+let originalToTrain, displayToTrain, cOToTrain, cDToTrain, wToTrain, hToTrain, videoToTrain, uToTrain, statusToTrain, labelToTrain, originalToRun, cOToRun, videoToRun, uToRun, finalDataToRun, nnToRun, divToRun, x = [],
+    y = [];
+
+function createCanvas(t, e) {
+    let a = document.createElement("canvas");
+    return a.width = t, a.height = e, a
+}
+
+function initToTrain() {
+    inputs = [], outputs = [], x = [], y = [], originalToTrain = createCanvas(widthCanvasVideo, heightCanvasVideo), cOToTrain = originalToTrain.getContext("2d", {
+        alpha: !1
+    }), displayToTrain = createCanvas(widthCanvasVideo, heightCanvasVideo), cDToTrain = displayToTrain.getContext("2d", {
+        alpha: !1
+    });
+    let t = document.getElementById("left"),
+        e = document.getElementById("right");
+    t.innerHTML = "", e.innerHTML = "", t.appendChild(originalToTrain), e.appendChild(displayToTrain), (statusToTrain = document.createElement("div")).style.textAlign = "center", statusToTrain.innerHTML = " ", e.appendChild(statusToTrain), labelButtonRight = document.createElement("button"), labelButtonRight.innerHTML = "Eliminar ultima entrada a la base", labelButtonRight.id = "labelButtonRight", labelButtonRight.style.textAlign = "center", labelButtonRight.style.display = "none", e.appendChild(labelButtonRight), labelButtonRight.addEventListener("click", function() {
+        undo(), x.length >= 0 && (document.querySelector("#run").style.display = "none")
+    }), labelInputLeft = document.createElement("input"), labelInputLeft.id = "labelInputLeft", labelInputLeft.type = "text", labelInputLeft.style.textAlign = "center", labelInputLeft.placeholder = "Etiqueta", t.appendChild(labelInputLeft), t.appendChild(document.createElement("br")), labelButtonLeft = document.createElement("button"), labelButtonLeft.innerHTML = "Agregar nueva entrada a la base", labelButtonLeft.id = "labelButtonLeft", labelButtonLeft.style.textAlign = "center", t.appendChild(labelButtonLeft), labelButtonLeft.addEventListener("click", function() {
+        captureToTrain()
+    }), getVideoToTrain()
+}
+
+function getVideoToTrain() {
+    navigator.mediaDevices.getUserMedia({
+        audio: !1,
+        video: {
+            width: widthVideo,
+            height: heightVideo
+        }
+    }).then(function(t) {
+        (videoToTrain = document.createElement("video")).srcObject = t, videoToTrain.onloadedmetadata = function(t) {
+            videoToTrain.play(), updateToTrain()
+        }
+    }).catch(function(t) {
+        console.error(t)
+    })
+}
+
+function updateToTrain() {
+    videoToTrain && (cOToTrain.drawImage(videoToTrain, 0, 0, widthCanvasVideo, heightCanvasVideo), uToTrain = requestAnimationFrame(updateToTrain))
+}
+
+function addDataToTrain() {
+    let t = labelInputLeft.value.toString();
+    if (x.length >= 0 ? (document.querySelector("#run").style.display = "block", labelButtonRight.style.display = "block") : (document.querySelector("#run").style.display = "none", labelButtonRight.style.display = "none"), "" == t) return x.length < 1 ? (document.querySelector("#run").style.display = "none", labelButtonRight.style.display = "none") : (document.querySelector("#run").style.display = "block", labelButtonRight.style.display = "block"), void(statusToTrain.innerHTML = "Añade una etiqueta para agregar la nueva entrada a la base.");
+    let e = new Image;
+    e.src = displayToTrain.toDataURL(), e.onload = function() {
+        let a = createCanvas(widthCanvas, heightCanvas);
+        cTToTrain = a.getContext("2d", {
+            alpha: !1
+        }), cTToTrain.drawImage(e, 0, 0, widthCanvas, heightCanvas);
+        let n = cTToTrain.getImageData(0, 0, widthCanvas, heightCanvas);
+        n = ImageUtils.gaussianBlur(n);
+        let i = Array(widthCanvas * heightCanvas);
+        for (let t = 0; t < i.length; t++) i[t] = n.data[4 * t];
+        x.push(i), y.push(t), statusToTrain.innerHTML = "Tamaño de la base de datos: " + x.length + ', Se agrego "' + t + '" como nueva entrada a la base.'
+    }
+}
+
+function captureToTrain(t) {
+    x.length < 1 ? document.querySelector("#run").style.display = "none" : document.querySelector("#run").style.display = "block", labelButtonRight.style.display = "block";
+    let e = cOToTrain.getImageData(0, 0, widthCanvasVideo, heightCanvasVideo);
+    e = ImageUtils.rgb2gray(e), cDToTrain.putImageData(e, 0, 0), addDataToTrain(t)
+}
+
+function undo() {
+    x.pop(), y.pop(), x.length > 0 ? labelButtonRight.style.display = "block" : labelButtonRight.style.display = "none", statusToTrain.innerHTML = "Tamaño de la base de datos: " + x.length + ", Se elimino la ultima entrada a la base"
+}
+
+function save() {
+    inputs = x, outputs = y
+}
+
+function createCanvas(t, e) {
+    let a = document.createElement("canvas");
+    return a.width = t, a.height = e, a
+}
+
+function initToRun() {
+    document.querySelector("#download-data").style.display = "block", originalToRun = createCanvas(widthCanvasVideo, heightCanvasVideo), cOToRun = originalToRun.getContext("2d", {
+        alpha: !1
+    });
+    let t = document.getElementById("left"),
+        e = document.getElementById("right");
+    t.innerHTML = "", e.innerHTML = "", (divToRun = document.createElement("div")).id = "result", e.appendChild(divToRun), divToRun.style.background = "#fff", divToRun.style.color = "#000", t.appendChild(originalToRun), getVideoToRun()
+}
+
+function getVideoToRun() {
+    navigator.mediaDevices.getUserMedia({
+        audio: !1,
+        video: {
+            width: widthVideo,
+            height: heightVideo
+        }
+    }).then(function(t) {
+        (videoToRun = document.createElement("video")).srcObject = t, videoToRun.onloadedmetadata = function(t) {
+            videoToRun.play(), updateToRun()
+        }
+    }).catch(function(t) {
+        console.error(t)
+    })
+}
+nnToRun = new Perceptron({
+    epochs: 1e3,
+    neurons: 2,
+    learningRate: .001,
+    maxTime: 1e4,
+    returnText: !0
+});
+var breakUpdateToRun = !1;
+
+function updateToRun() {
+    if (breakUpdateToRun && videoToRun) {
+        if (cOToRun.drawImage(videoToRun, 0, 0, widthCanvasVideo, heightCanvasVideo), imgAsArrayToRun(), finalDataToRun) {
+            let t = nnToRun.run(finalDataToRun);
+            divToRun.innerHTML = "Etiqueta: " + t.output + ", Probabilidad: " + t.probability
+        }
+        breakUpdateToRun && (uToRun = requestAnimationFrame(updateToRun))
+    }
+}
+
+function imgAsArrayToRun() {
+    let t = cOToRun.getImageData(0, 0, widthCanvasVideo, heightCanvasVideo);
+    t = ImageUtils.rgb2gray(t);
+    let e = createCanvas(widthCanvasVideo, heightCanvasVideo),
+        a = e.getContext("2d", {
+            alpha: !1
+        });
+    a.putImageData(t, 0, 0);
+    let n = new Image;
+    n.src = e.toDataURL(), n.onload = function() {
+        let t = createCanvas(widthCanvas, heightCanvas);
+        (a = t.getContext("2d", {
+            alpha: !1
+        })).drawImage(n, 0, 0, widthCanvas, heightCanvas);
+        let e = a.getImageData(0, 0, widthCanvas, heightCanvas);
+        e = ImageUtils.gaussianBlur(e), finalDataToRun = Array(widthCanvas * heightCanvas);
+        for (let t = 0; t < finalDataToRun.length; t++) finalDataToRun[t] = e.data[4 * t]
+    }
+}
+async function readData(t) {
+    if (t) {
+        var e = new FileReader;
+        e.onload = async function(t) {
+            var e = t.target.result;
+            await nnToRun.load(e), initToRun()
+        }, await e.readAsText(t)
+    }
+}
+let fileData = {};
+
+function dropHandler(t) {
+    if (t.preventDefault(), t.dataTransfer.items) {
+        for (var e = 0; e < t.dataTransfer.items.length; e++)
+            if ("file" === t.dataTransfer.items[e].kind) {
+                var a = t.dataTransfer.items[e].getAsFile();
+                "json" == a.name.toString().split(".")[1] ? (document.getElementById("file-span").style.dispay = "block", document.getElementById("file-span").innerHTML = 'Archivo: "' + a.name + '" - Valido', fileData = a, document.querySelector("#load-data").style.display = "block") : (document.getElementById("file-span").style.dispay = "block", document.getElementById("file-span").innerHTML = 'Archivo: "' + a.name + '" - Invalido', document.querySelector("#load-data").style.display = "none")
+            }
+    } else
+        for (e = 0; e < t.dataTransfer.files.length; e++);
+    removeDragData(t)
+}
+
+function dragOverHandler(t) {
+    t.preventDefault()
+}
+
+function removeDragData(t) {
+    t.dataTransfer.items ? t.dataTransfer.items.clear() : t.dataTransfer.clearData()
+}
+window.sleep = async function(t) {
+    await new Promise(e => setTimeout(e, t))
+}, document.querySelector("#load-data").addEventListener("click", async function() {
+    document.querySelector("#load-data").style.display = "none", document.querySelector("#file-div").style.display = "none", document.querySelector("#download-data").style.display = "block", document.querySelector("#run").style.display = "none", document.querySelector("#train").style.display = "block", readData(fileData)
+}), document.querySelector("#download-data").addEventListener("click", function() {
+    nnToRun.save()
+}), document.querySelector("#run").addEventListener("click", function() {
+    breakUpdateToRun = !0, document.querySelector("#download-data").style.display = "block", document.querySelector("#load-data").style.display = "none", document.querySelector("#file-div").style.display = "none", document.querySelector("#run").style.display = "none", document.querySelector("#train").style.display = "block", save(), nnToRun.train({
+        inputs: inputs,
+        outputs: outputs
+    }), videoToTrain.pause(), videoToTrain.currentTime = 0, initToRun()
+}), document.querySelector("#train").addEventListener("click", function() {
+    breakUpdateToRun = !1, document.querySelector("#train").style.display = "none", document.getElementById("file-span").style.dispay = "none", document.getElementById("file-span").innerHTML = "", document.querySelector("#load-data").style.display = "none", document.querySelector("#file-div").style.display = "block", document.querySelector("#download-data").style.display = "none", nnToRun = new Perceptron({
+        epochs: 1e3,
+        neurons: 2,
+        learningRate: .001,
+        maxTime: 1e4,
+        returnText: !0
+    }), fileData = {}, videoToRun.pause(), videoToRun.currentTime = 0, initToTrain()
+}), document.body.addEventListener("keydown", function(t) {
+    switch (t.keyCode) {
+        case 13:
+            captureToTrain();
+            break;
+        case 40:
+            undo()
+    }
+}), window.onload = initToTrain();
+        </script>
+</body>
+
+</html>
